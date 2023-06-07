@@ -1,12 +1,10 @@
-use std::env;
 use std::fs;
 use std::path;
-use clap::{Args, Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand, ValueEnum};
 
-/// Rit :)
+/// rit - git, but in rust, and definitely not complete
 #[derive(Debug, Parser)] // requires `derive` feature
-#[command(name = "rit")]
-#[command(about = "Rit :)", long_about = None)]
+#[command(long_about = None)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -14,12 +12,18 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
+    /// Initializes a new, empty Git repository. Fails if ".git" folder already exists in worktree_root.
     Init {
+        /// Path to the folder that should become the new worktree root, i.e. in which we will create ".git".
         worktree_root: String,
     },
+    /// Computes git object representation of given object_type.
     HashObject {
+        /// What kind of Git object do we wish to make?
         object_type: GitObjectType,
+        /// Path to the file we wish to hash.
         filepath: path::PathBuf,
+        /// Actually write generated object to Git object store of current repo.
         do_write: Option<bool>,
     }
 }
@@ -34,10 +38,10 @@ fn main() {
             object_type,
             filepath,
         } => {
-            cmd_hash_object(do_write, object_type, &filepath);
+            cmd_hash_object(do_write, object_type, &filepath).unwrap();
         }
         Commands::Init {worktree_root}  => {
-            cmd_init(&worktree_root);
+            cmd_init(&worktree_root).unwrap();
         }
     }
 
@@ -61,13 +65,13 @@ fn cmd_init(worktree_root: &str) -> Result<(), &str> {
     if git_root.exists() {
         return Err("git root already exists")
     }
-    fs::create_dir_all(&git_root);
-    fs::create_dir_all(git_root.join("objects"));
+    fs::create_dir_all(&git_root).unwrap();
+    fs::create_dir_all(git_root.join("objects")).unwrap();
     let refs_root = git_root.join("refs");
-    fs::create_dir_all(refs_root.join("heads"));
-    fs::create_dir_all(refs_root.join("tags"));
-    fs::write(git_root.join("description"), "ce n'est pas un dépôt git");
-    fs::write(git_root.join("HEAD"), "ref: refs/heads/main\n");
+    fs::create_dir_all(refs_root.join("heads")).unwrap();
+    fs::create_dir_all(refs_root.join("tags")).unwrap();
+    fs::write(git_root.join("description"), "ce n'est pas un dépôt git").unwrap();
+    fs::write(git_root.join("HEAD"), "ref: refs/heads/main\n").unwrap();
 
     // weird line endings to get a) newlines but also b) skip following whitespace indent
     let default_config = "\
@@ -75,17 +79,22 @@ fn cmd_init(worktree_root: &str) -> Result<(), &str> {
     repositoryformatversion = 0\n\
     filemode = false\n\
     bare = false\n";
-    fs::write(git_root.join("config"), default_config);
+    fs::write(git_root.join("config"), default_config).unwrap();
 
     return Ok(())
 }
 
 
+/// The different kinds of objects Git knows about.
 #[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
 enum GitObjectType {
+    /// Just a bunch of data.
     Blob,
+    /// Represents a file system.
     Tree,
+    /// A link to another object.
     Tag,
+    /// A Git commit.
     Commit,
 }
 
