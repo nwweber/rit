@@ -38,7 +38,7 @@ fn main() {
             object_type,
             filepath,
         } => {
-            cmd_hash_object(do_write, object_type, &filepath).unwrap();
+            cmd_hash_object(do_write, object_type, &filepath);
         }
         Commands::Init {worktree_root}  => {
             cmd_init(&worktree_root).unwrap();
@@ -99,15 +99,38 @@ enum GitObjectType {
 }
 
 /// create GitObject of given type, using data located at filepath; write to git object storage if do_write is true
-fn cmd_hash_object(do_write: Option<bool>, object_type: GitObjectType, filepath: &path::Path) -> Result<(), &str> {
+fn cmd_hash_object(do_write: Option<bool>, object_type: GitObjectType, filepath: &path::Path) {
    println!("doing hash object"); 
    // get file contents
-   let file_contents = fs::read(filepath);
+   let mut file_contents = fs::read(filepath).expect("expected to be able to read file for hashing");
    //dbg!(file_contents);
    // construct git obj contents
+   let git_type = match object_type {
+        GitObjectType::Blob => "blob",
+        GitObjectType::Tree => "tree",
+        GitObjectType::Tag => "tag",
+        GitObjectType::Commit => "commit",
+   };
+   let contents_length = file_contents.len();
+   // length of file contents plus a bit - can count it out exactly later
+   let mut object_bytes: Vec<u8> = Vec::with_capacity(contents_length + 50);
+   // format of git object:
+   // object_type0x20size_in_bytes0x00contents
+   for byte in git_type.bytes(){
+        object_bytes.push(byte);
+    }
+   let ascii_whitespace = 32;
+   object_bytes.push(ascii_whitespace);
+   // converting to string so we can iterate over the individual digits
+   for c in contents_length.to_string().bytes() {
+           object_bytes.push(c);
+   }
+   object_bytes.push(0);
+   object_bytes.append(&mut file_contents);
+   dbg!(&object_bytes);
+   //dbg!(String::from(contents_length.to_string()));
    // hash
    // determine file path, including path to object dir
    // if write: write using zlib compression
 
-   return Ok(())
 }
