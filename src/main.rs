@@ -34,6 +34,13 @@ enum Commands {
         //#[arg(long, short)]
         filepath: path::PathBuf,
     },
+    /// Displays contents of file in object storage.
+    CatFile {
+            /// What kind of Git object we wish to cat.
+            object_type: GitObjectType,
+            /// The name of the object, currently only implemented for full sha1-digests
+            object: String,
+    },
 }
 
 fn main() {
@@ -49,8 +56,16 @@ fn main() {
         }
         Commands::Init { worktree_root } => {
             cmd_init(&worktree_root).unwrap();
-        }
+        },
+        Commands::CatFile {object_type, object } => {
+            cmd_cat_file(object_type, object);
+        },
     }
+}
+
+/// shows contents of `object`, assuming it is a `object_type`
+fn cmd_cat_file(object_type: GitObjectType, object: String) {
+    println!("cat-file coming soon :)");
 }
 
 /// 'init' generates the files necessary for an empty git repository
