@@ -25,11 +25,14 @@ enum Commands {
     /// Computes git object representation of given object_type.
     HashObject {
         /// What kind of Git object do we wish to make?
-        object_type: GitObjectType,
-        /// Path to the file we wish to hash.
-        filepath: path::PathBuf,
+        #[arg(long, short, default_value="blob")]
+        object_type: Option<GitObjectType>,
         /// Actually write generated object to Git object store of current repo.
-        do_write: Option<bool>,
+        #[arg(short,long, required=false, num_args=0, default_value="false")]
+        write: bool,
+        /// Path to the file we wish to hash.
+        //#[arg(long, short)]
+        filepath: path::PathBuf,
     },
 }
 
@@ -38,11 +41,11 @@ fn main() {
 
     match args2.command {
         Commands::HashObject {
-            do_write,
             object_type,
+            write,
             filepath,
         } => {
-            cmd_hash_object(do_write, object_type, &filepath);
+            cmd_hash_object(write, object_type, &filepath);
         }
         Commands::Init { worktree_root } => {
             cmd_init(&worktree_root).unwrap();
@@ -106,8 +109,8 @@ impl GitObjectType {
 
 /// create GitObject of given type, using data located at filepath; write to git object storage if do_write is true (default: false)
 /// writes hash to stdout. objects in storage always zlib-compressed
-fn cmd_hash_object(do_write: Option<bool>, object_type: GitObjectType, filepath: &path::Path) {
-    let do_write = do_write.unwrap_or(false);
+fn cmd_hash_object(do_write: bool, object_type: Option<GitObjectType>, filepath: &path::Path) {
+    let object_type = object_type.unwrap_or(GitObjectType::Blob);
 
     let git_type = object_type.name_as_string();
     let mut file_contents =
