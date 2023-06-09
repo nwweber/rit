@@ -1,11 +1,13 @@
 use clap::{Parser, Subcommand, ValueEnum};
-use flate2::write::ZlibEncoder;
+use flate2::write::{ZlibEncoder, ZlibDecoder};
 use flate2::Compression;
 use hex;
 use sha1::{Digest, Sha1};
 use std::fs;
-use std::io::Write;
 use std::path;
+use std::str;
+use std::io::{self, Write};
+
 
 /// rit - git, but in rust, and definitely not complete
 #[derive(Debug, Parser)]
@@ -25,10 +27,10 @@ enum Commands {
     /// Computes git object representation of given object_type.
     HashObject {
         /// What kind of Git object do we wish to make?
-        #[arg(long, short, default_value="blob")]
+        #[arg(long, short, default_value = "blob")]
         object_type: Option<GitObjectType>,
         /// Actually write generated object to Git object store of current repo.
-        #[arg(short,long, required=false, num_args=0, default_value="false")]
+        #[arg(short, long, required = false, num_args = 0, default_value = "false")]
         write: bool,
         /// Path to the file we wish to hash.
         //#[arg(long, short)]
@@ -36,10 +38,10 @@ enum Commands {
     },
     /// Displays contents of file in object storage.
     CatFile {
-            /// What kind of Git object we wish to cat.
-            object_type: GitObjectType,
-            /// The name of the object, currently only implemented for full sha1-digests
-            object: String,
+        /// What kind of Git object we wish to cat.
+        object_type: GitObjectType,
+        /// The name of the object, currently only implemented for full sha1-digests
+        object: String,
     },
 }
 
@@ -56,16 +58,39 @@ fn main() {
         }
         Commands::Init { worktree_root } => {
             cmd_init(&worktree_root).unwrap();
-        },
-        Commands::CatFile {object_type, object } => {
+        }
+        Commands::CatFile {
+            object_type,
+            object,
+        } => {
             cmd_cat_file(object_type, object);
-        },
+        }
     }
 }
 
 /// shows contents of `object`, assuming it is a `object_type`
+/// for now just for blobs, will evolve as necessary
 fn cmd_cat_file(object_type: GitObjectType, object: String) {
-    println!("cat-file coming soon :)");
+    match object_type {
+        GitObjectType::Blob => (),
+        _ => panic!("only blob type currently supported"),
+    };
+    // determine path to file
+    let git_root = find_git_root(None).expect("could not locate git root");
+    let object_path = git_root
+        .join("objects")
+        .join(&object[..2])
+        .join(&object[2..]);
+    let mut file_contents = Vec::new();
+    let mut z = ZlibDecoder::new(file_contents);
+    z.write_all(fs::read(object_path).unwrap().as_slice()).unwrap();
+    file_contents = z.finish().unwrap();
+    let content_boundary = file_contents.iter().position(|&x| x == 0x00).unwrap();
+    // let object_header = &file_contents[..content_boundary];
+    let object_body = &file_contents[content_boundary+1..];
+    // git cat-file returns "raw, but uncompressed contents". let's do the same
+    // what will this stream of bytes look like when written to stdout? apparently like text as long as those bytes are within the ascii range :)
+    io::stdout().write_all(object_body).unwrap();
 }
 
 /// 'init' generates the files necessary for an empty git repository
